@@ -1,0 +1,77 @@
+#!/usr/bin/env sh
+
+# FIXME: improve and document arguments
+# FIXME: don't work correctly for two screens with different dpi/geometry
+# FIXME: check for more than two screens
+
+direction="right"
+if [ -n "$1" ] && [ "$1" = "left" ]; then
+  direction="left"
+fi
+
+
+# Compute the screen geometry details
+export total_width=$(xdpyinfo | grep 'dimensions:' | awk '{ print $2 }' | head -n1 | cut -d'x' -f1)
+export display_width=$(xdotool getdisplaygeometry | cut -d" " -f1)
+export nbr_screens=$(xrandr -q | grep "connected" | wc -l)
+export screen_size=$(expr "$total_width" / "$nbr_screens")
+export last_screen_limit=$(expr $(expr "$nbr_screens" - 1) '*' "$screen_size")
+export half_screen_width=$(expr "$screen_size" / 2)
+
+
+window_id=$(xdotool getactivewindow)
+
+# Un-maximize current window so that we can move it
+wmctrl -ir "$window_id" -b remove,maximized_horz
+
+#Make the windows full height
+wmctrl -ir "$window_id" -b add,maximized_vert
+
+# Read window width
+win_width=$(xdotool getwindowgeometry "$window_id" | grep 'Geometry:' | awk '{ print $2 }' | cut -d'x' -f1)
+win_height=$(xdotool getwindowgeometry "$window_id" | grep 'Geometry:' | awk '{ print $2 }' | cut -d'x' -f2)
+win_x=$(xwininfo -id "$window_id" | grep 'Absolute upper-left X:' | awk '{ print $4 }')
+win_y=$(xwininfo -id "$window_id" | grep 'Absolute upper-left Y:' | awk '{ print $4 }')
+
+# Subtract any offsets caused by panels or window decorations
+x_offset=$(xwininfo -id "$window_id" | grep 'Relative upper-left X:' | awk '{ print $4 }')
+y_offset=$(xwininfo -id "$window_id" | grep 'Relative upper-left Y:' | awk '{ print $4 }')
+win_x=$(expr "$win_x" - "$x_offset")
+win_y=$(expr "$win_y" - "$y_offset")
+
+# Resize the window horizontally
+window_expected_width=$(expr "$half_screen_width" - 2 '*' "$x_offset")
+if [ "$win_width" -ne "$window_expected_width" ]; then
+  xdotool windowsize "$window_id" "$window_expected_width" "$win_height"
+fi
+
+# Recompute the X pos after resize (just to be sure)
+win_x=$(xwininfo -id "$window_id" | grep 'Absolute upper-left X:' | awk '{ print $4 }')
+win_x=$(expr "$win_x" - "$x_offset")
+
+# Compute new X position
+if [ "$direction" = "left" ]; then
+  new_x=0
+  current="$half_screen_width"
+
+  while [ "$win_x" -gt "$current" ]; do
+    new_x=$(expr "$new_x" + "$half_screen_width")
+    current=$(expr "$current" + "$half_screen_width")
+  done
+else # direction == "right"
+  new_x="$half_screen_width"
+  current="$half_screen_width"
+  max_x=$(expr "$total_width" - "$half_screen_width")
+  while [ "$win_x" -ge "$current" ] && [ "$current" -lt "$max_x" ] ; do
+    new_x=$(expr "$new_x" + "$half_screen_width")
+    current=$(expr "$current" + "$half_screen_width")
+  done 
+fi
+
+# Don't move off the left side.
+if [ $new_x -lt 0 ]; then
+  new_x=0
+fi
+
+# Move the window
+xdotool windowmove "$window_id" "$new_x" "$win_y"
