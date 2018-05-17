@@ -47,6 +47,23 @@ alias zs_clean="rm ~/ZephyTOOLS/APPLI/TMP/* ; python ~/ZephyTOOLS/ZephyTOOLS/UPD
 alias ZEPHYDEV="env UBUNTU_MENUPROXY=0 python ~/ZephyTOOLS/APPLI/BIN/MAIN.pyc"
 alias zephydev="env UBUNTU_MENUPROXY=0 python ~/ZephyTOOLS/APPLI/BIN/MAIN.pyc"
 
+ZT(){
+    export ZEPHYCLOUD_CA_ROOT="/home/sam/projects/zephycloud/tmp/certs/root_ca.pem"
+    export ZEPHYCLOUD_SERVER="zephycloud.test.local"
+    python ~/ZephyTOOLS/ZephyTOOLS/UPDATE/UPDATE.py
+    env UBUNTU_MENUPROXY=0 python ~/ZephyTOOLS/APPLI/BIN/MAIN.pyc
+}
+export ZT
+
+# Docker utils
+dockershell(){
+    docker exec -it $1 bash -c "stty cols $COLUMNS rows $LINES && bash";
+}
+_dockershell(){
+    COMPREPLY=( $(docker ps --format "{{.Names}}" -f name=$2) );
+}
+complete -F _dockershell dockershell;
+export dockershell;
 
 
 
